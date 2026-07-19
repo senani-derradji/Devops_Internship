@@ -3,25 +3,254 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Simple Page</title>
+  <title>Mini Football Game</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 40px; background: #f7f9fc; color: #20232a; }
-    .card { background: white; border-radius: 12px; padding: 24px; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
-    button { padding: 10px 18px; border: none; border-radius: 8px; background: #0078d4; color: white; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: #f7f9fc;
+      color: #20232a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 560px;
+      width: 100%;
+      margin: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    canvas {
+      background: #2e8b2e;
+      border-radius: 8px;
+      display: block;
+      margin: 16px auto;
+      touch-action: none;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #0078d4;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+      margin: 4px;
+    }
     button:hover { background: #005fa3; }
+    #status { font-weight: bold; min-height: 24px; }
+    #score { font-size: 18px; margin-top: 8px; }
+    .hint { color: #666; font-size: 13px; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Hello from FastAPI</h1>
-    <p>This is a simple page served by a FastAPI app on <strong>localhost:8000</strong>.</p>
-    <button id="messageButton">Click me</button>
-    <p id="message"></p>
+    <h1>⚽ Mini Football Game</h1>
+    <p class="hint">Click and drag from the ball, then release to shoot toward the goal!</p>
+    <canvas id="game" width="480" height="320"></canvas>
+    <div id="status"></div>
+    <div id="score">Goals: 0 &nbsp;|&nbsp; Shots: 0</div>
+    <button id="resetButton">Reset Ball</button>
   </div>
+
   <script>
-    document.getElementById('messageButton').addEventListener('click', () => {
-      document.getElementById('message').textContent = 'FastAPI + HTML + JavaScript works!';
-    });
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const scoreEl = document.getElementById('score');
+
+    const W = canvas.width, H = canvas.height;
+
+    const goal = { x: W / 2 - 60, width: 120, y: 0, height: 14 };
+    const keeper = { x: W / 2 - 20, y: 10, width: 40, height: 14, dir: 1, speed: 2 };
+
+    let goals = 0, shots = 0;
+    let ballMoving = false;
+    let dragging = false;
+    let dragStart = null;
+
+    function initialBall() {
+      return { x: W / 2, y: H - 60, vx: 0, vy: 0, radius: 10 };
+    }
+    let ball = initialBall();
+
+    function resetBall() {
+      ball = initialBall();
+      ballMoving = false;
+      statusEl.textContent = '';
+      draw();
+    }
+
+    function drawField() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#2e8b2e';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, H / 2);
+      ctx.lineTo(W, H / 2);
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+      ctx.strokeStyle = 'white';
+      ctx.strokeRect(goal.x - 4, goal.y, goal.width + 8, 40);
+    }
+
+    function drawKeeper() {
+      ctx.fillStyle = '#ffdd00';
+      ctx.fillRect(keeper.x, keeper.y, keeper.width, keeper.height);
+    }
+
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    function drawAim() {
+      if (dragging && dragStart) {
+        ctx.beginPath();
+        ctx.moveTo(ball.x, ball.y);
+        ctx.lineTo(dragStart.curX, dragStart.curY);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function draw() {
+      drawField();
+      drawKeeper();
+      drawAim();
+      drawBall();
+    }
+
+    function updateKeeper() {
+      keeper.x += keeper.dir * keeper.speed;
+      if (keeper.x <= goal.x || keeper.x + keeper.width >= goal.x + goal.width) {
+        keeper.dir *= -1;
+      }
+    }
+
+    function checkResult() {
+      if (ball.y - ball.radius <= goal.y + goal.height) {
+        const hitKeeper =
+          ball.x + ball.radius > keeper.x &&
+          ball.x - ball.radius < keeper.x + keeper.width &&
+          ball.y - ball.radius < keeper.y + keeper.height;
+
+        const inGoal = ball.x > goal.x && ball.x < goal.x + goal.width;
+
+        if (inGoal && !hitKeeper) {
+          goals++;
+          statusEl.textContent = '⚽ GOAL!';
+          statusEl.style.color = '#0a8a0a';
+        } else if (hitKeeper) {
+          statusEl.textContent = '🧤 Saved by the keeper!';
+          statusEl.style.color = '#c0392b';
+        } else {
+          statusEl.textContent = '❌ Missed!';
+          statusEl.style.color = '#c0392b';
+        }
+        scoreEl.textContent = `Goals: ${goals} | Shots: ${shots}`;
+        ballMoving = false;
+        setTimeout(resetBall, 1200);
+        return true;
+      }
+      if (ball.x < 0 || ball.x > W) {
+        statusEl.textContent = '❌ Out of bounds!';
+        statusEl.style.color = '#c0392b';
+        ballMoving = false;
+        setTimeout(resetBall, 1000);
+        return true;
+      }
+      return false;
+    }
+
+    function loop() {
+      updateKeeper();
+      if (ballMoving) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        if (checkResult()) {
+          draw();
+          requestAnimationFrame(loop);
+          return;
+        }
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function getPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function onDown(evt) {
+      if (ballMoving) return;
+      const pos = getPos(evt);
+      const d = Math.hypot(pos.x - ball.x, pos.y - ball.y);
+      if (d < 40) {
+        dragging = true;
+        dragStart = { curX: pos.x, curY: pos.y };
+      }
+    }
+
+    function onMove(evt) {
+      if (!dragging) return;
+      const pos = getPos(evt);
+      dragStart.curX = pos.x;
+      dragStart.curY = pos.y;
+    }
+
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      const dx = ball.x - dragStart.curX;
+      const dy = ball.y - dragStart.curY;
+      const power = Math.min(Math.hypot(dx, dy) / 6, 14);
+      if (power > 1) {
+        const angle = Math.atan2(dy, dx);
+        ball.vx = Math.cos(angle) * power;
+        ball.vy = Math.sin(angle) * power;
+        ballMoving = true;
+        shots++;
+        statusEl.textContent = '';
+        scoreEl.textContent = `Goals: ${goals} | Shots: ${shots}`;
+      }
+      dragStart = null;
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mouseleave', onUp);
+    canvas.addEventListener('touchstart', onDown);
+    canvas.addEventListener('touchmove', onMove);
+    canvas.addEventListener('touchend', onUp);
+
+    document.getElementById('resetButton').addEventListener('click', resetBall);
+
+    draw();
+    loop();
   </script>
 </body>
 </html>
