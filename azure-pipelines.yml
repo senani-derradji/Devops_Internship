@@ -8,7 +8,7 @@ pool:
 
 variables:
   pythonVersion: '3.12'
-  imageRepository: 'fastapi-app'
+  imageRepository: 'YOUR_DOCKERHUB_USERNAME/devops-internship'
   dockerfilePath: 'Dockerfile'
   tag: '$(Build.BuildId)'
 
@@ -18,7 +18,7 @@ stages:
   displayName: Build & Test
 
   jobs:
-  - job: CI
+  - job: Build
 
     steps:
     - checkout: self
@@ -38,7 +38,7 @@ stages:
 
 
 - stage: Docker
-  displayName: Build & Push Image
+  displayName: Build & Push Docker Image
 
   dependsOn: Build
 
@@ -48,27 +48,12 @@ stages:
     steps:
 
     - task: Docker@2
-      displayName: Login to Azure Container Registry
+      displayName: Build and Push Docker Image
       inputs:
-        command: login
-        containerRegistry: AzureACR
-
-    - task: Docker@2
-      displayName: Build Docker Image
-      inputs:
-        command: build
+        command: buildAndPush
+        containerRegistry: derradji
         repository: $(imageRepository)
         dockerfile: $(dockerfilePath)
-        tags: |
-          latest
-          $(tag)
-
-    - task: Docker@2
-      displayName: Push Docker Image
-      inputs:
-        command: push
-        repository: $(imageRepository)
-        containerRegistry: AzureACR
         tags: |
           latest
           $(tag)
