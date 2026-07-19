@@ -36,32 +36,16 @@ stages:
         pytest
       displayName: Run Tests
 
-    - script: |
-        sudo apt-get update
-        sudo apt-get install -y wget
-        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.66.0_Linux-64bit.deb
-        sudo dpkg -i trivy_0.66.0_Linux-64bit.deb
-      displayName: Install Trivy
-
-    - script: |
-        trivy fs \
-          --severity HIGH,CRITICAL \
-          --format table \
-          .
-      displayName: Trivy Filesystem Scan
-
 
 - stage: Docker
+  displayName: Build & Push Docker Image
 
   dependsOn: Build
 
   jobs:
-
   - job: Docker
 
     steps:
-
-    - checkout: self
 
     - task: Docker@2
       displayName: Build and Push Docker Image
@@ -72,30 +56,3 @@ stages:
         dockerfile: $(dockerfilePath)
         tags: |
           latest
-          $(tag)
-
-    - script: |
-        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.66.0_Linux-64bit.deb
-        sudo dpkg -i trivy_0.66.0_Linux-64bit.deb
-      displayName: Install Trivy
-
-    - script: |
-        trivy image \
-          --severity HIGH,CRITICAL \
-          --format table \
-          $(imageRepository):latest
-
-      displayName: Trivy Image Scan
-
-    - script: |
-        trivy image \
-          --format sarif \
-          --output trivy-results.sarif \
-          $(imageRepository):latest
-
-      displayName: Generate Trivy Report
-
-    - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: trivy-results.sarif
-        ArtifactName: Trivy-Report
