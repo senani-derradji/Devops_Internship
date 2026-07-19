@@ -8,7 +8,7 @@ pool:
 
 variables:
   pythonVersion: '3.12'
-  imageRepository: 'YOUR_DOCKERHUB_USERNAME/devops-internship'
+  imageRepository: 'derradjisenani/devops-codealpha-internship'
   dockerfilePath: 'Dockerfile'
   tag: '$(Build.BuildId)'
 
