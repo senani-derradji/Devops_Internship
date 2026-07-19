@@ -6,19 +6,69 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
-steps:
+variables:
+  pythonVersion: '3.12'
+  imageRepository: 'fastapi-app'
+  dockerfilePath: 'Dockerfile'
+  tag: '$(Build.BuildId)'
 
-- checkout: self
+stages:
 
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.12'
+- stage: Build
+  displayName: Build & Test
 
-- script: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-  displayName: Install Dependencies
+  jobs:
+  - job: CI
 
-- script: |
-    pytest
-  displayName: Run Tests
+    steps:
+    - checkout: self
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: $(pythonVersion)
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: Install Dependencies
+
+    - script: |
+        pytest
+      displayName: Run Tests
+
+
+- stage: Docker
+  displayName: Build & Push Image
+
+  dependsOn: Build
+
+  jobs:
+  - job: Docker
+
+    steps:
+
+    - task: Docker@2
+      displayName: Login to Azure Container Registry
+      inputs:
+        command: login
+        containerRegistry: AzureACR
+
+    - task: Docker@2
+      displayName: Build Docker Image
+      inputs:
+        command: build
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        tags: |
+          latest
+          $(tag)
+
+    - task: Docker@2
+      displayName: Push Docker Image
+      inputs:
+        command: push
+        repository: $(imageRepository)
+        containerRegistry: AzureACR
+        tags: |
+          latest
+          $(tag)
